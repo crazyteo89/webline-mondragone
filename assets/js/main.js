@@ -95,7 +95,7 @@
 
   // Entrate delle sezioni: ognuna a modo suo, una volta sola
   const entrate = [
-    ['.repair__head', 'rv'], ['.sale .h2', 'rv-clip'], ['.sale__list', 'stagger'],
+    ['.repair__head', 'rv'], ['.sale .h2', 'rv-clip'], ['.sale__main', ''], ['.sale__more', 'stagger'],
     ['.tel__in', 'rv'], ['.tel__list', 'stagger'], ['.more .h2', 'rv-clip'],
     ['.more__main', 'rv-scale'], ['.more__list', 'stagger'], ['.voices .h2', 'rv'],
     ['.voices__list', 'stagger'], ['.write__text', 'rv'], ['.form', 'rv-scale'],
@@ -106,7 +106,8 @@
   }, { rootMargin: '0px 0px -12% 0px' }) : null;
   entrate.forEach(([sel, cls]) => document.querySelectorAll(sel).forEach(el => {
     if (cls === 'stagger') [...el.children].forEach((c, k) => c.style.setProperty('--k', k));
-    if (io) { el.classList.add(cls); io.observe(el); }
+    if (io) { if (cls) el.classList.add(cls); io.observe(el); }
+    else el.classList.add('in');
   }));
 
   // Assistenza: il dispositivo segue la voce più vicina al centro
@@ -120,10 +121,7 @@
     reps.forEach(r => r.classList.toggle('is-active', r === li));
     Object.entries(devs).forEach(([k, s]) => document.querySelector(s).classList.toggle('is-on', k === li.dataset.dev));
     const ph = document.querySelector('.dev--phone');
-    ph.querySelectorAll('[data-part],[data-hl]').forEach(p => {
-      const nome = p.dataset.part || p.dataset.hl;
-      p.classList.toggle('is-on', nome === li.dataset.part);
-    });
+    ph.querySelectorAll('.part').forEach(p => p.classList.toggle('is-on', p.dataset.part === li.dataset.part));
     cap.textContent = li.querySelector('h3').textContent;
   }
   attivaVoce(reps[0]);
@@ -131,14 +129,24 @@
   // Barra azioni mobile, operatori che scorrono e voce attiva: un solo ciclo rAF
   const dock = document.querySelector('.dock');
   const hero = document.querySelector('.hero');
-  const rows = [...document.querySelectorAll('.ops__row')];
-  const tel = document.querySelector('.tel');
+  const gruppi = [...document.querySelectorAll('.ops')].map(g => ({ box: g.closest('section'), rows: [...g.querySelectorAll('.ops__row')] }));
+  const navLinks = [...document.querySelectorAll('.nav a')];
+  const sezioni = navLinks.map(a => document.querySelector(a.getAttribute('href')));
   let ticking = false;
   function frame() {
     ticking = false;
     const vh = innerHeight;
     top.classList.toggle('is-scrolled', scrollY > 8);
-    dock.classList.toggle('is-on', hero.getBoundingClientRect().bottom < 80);
+    const dockOn = hero.getBoundingClientRect().bottom < 80;
+    dock.classList.toggle('is-on', dockOn);
+    document.body.classList.toggle('dock-on', dockOn);
+
+    // sezione corrente nel menu
+    let corrente = -1;
+    sezioni.forEach((s, i) => { if (s && s.getBoundingClientRect().top < vh * 0.4) corrente = i; });
+    const fine = sezioni[sezioni.length - 1];
+    if (fine && fine.getBoundingClientRect().bottom < vh * 0.4) corrente = -1;
+    navLinks.forEach((a, i) => { if (i === corrente) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); });
 
     const mid = vh * 0.5;
     let best = null, dist = Infinity;
@@ -150,11 +158,12 @@
     if (best) attivaVoce(best);
 
     if (!reduce) {
-      const b = tel.getBoundingClientRect();
-      if (b.bottom > 0 && b.top < vh) {
+      gruppi.forEach(({ box, rows }) => {
+        const b = box.getBoundingClientRect();
+        if (b.bottom < 0 || b.top > vh) return;
         const p = (vh - b.top) / (vh + b.height); // 0 → 1 mentre la sezione attraversa lo schermo
-        rows.forEach(r => { r.style.transform = `translate3d(${(+r.dataset.drift) * (p - 0.5) * -22}%,0,0)`; });
-      }
+        rows.forEach(r => { r.style.transform = `translate3d(${-20 + (+r.dataset.drift) * (p - 0.5) * -16}%,0,0)`; });
+      });
     }
   }
   const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(frame); } };
